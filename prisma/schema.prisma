@@ -1,0 +1,128 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+enum Role {
+    CUSTOMER
+      ADMIN
+}
+
+enum OrderStatus {
+    PENDING
+      PROCESSED
+        SHIPPED
+          COMPLETED
+            CANCELLED
+}
+
+model User {
+    id              String     @id @default(uuid())
+      name            String
+        whatsappNumber  String     @unique
+          passwordHash    String
+            role            Role       @default(CUSTOMER)
+
+              cartItems       CartItem[]
+                orders          Order[]
+                  createdAt       DateTime   @default(now())
+                    updatedAt       DateTime   @updatedAt
+                      @@index([whatsappNumber])
+}
+
+model Category {
+    id          String    @id @default(uuid())
+      name        String
+        slug        String    @unique
+          products    Product[]
+
+            createdAt   DateTime  @default(now())
+              updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+    id          String           @id @default(uuid())
+      name        String
+        slug        String           @unique
+          description String?          @db.Text
+            basePrice   Int
+              isActive    Boolean          @default(true)
+
+                categoryId  String
+                  category    Category         @relation(fields: [categoryId], references: [id])
+
+                    variants    ProductVariant[]
+                      images      ProductImage[]
+                        createdAt   DateTime         @default(now())
+                          updatedAt   DateTime         @updatedAt
+}
+
+model ProductImage {
+    id          String   @id @default(uuid())
+      url         String
+        isPrimary   Boolean  @default(false)
+
+          productId   String
+            product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model ProductVariant {
+    id          String      @id @default(uuid())
+      sku         String      @unique
+        color       String
+          size        String
+            stock       Int         @default(0)
+
+              productId   String
+                product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+                  cartItems   CartItem[]
+                    orderItems  OrderItem[]
+                      createdAt   DateTime    @default(now())
+                        updatedAt   DateTime    @updatedAt
+}
+
+model CartItem {
+    id          String         @id @default(uuid())
+      quantity    Int            @default(1)
+
+        userId      String
+          user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+            variantId   String
+              variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+                createdAt   DateTime       @default(now())
+                  updatedAt   DateTime       @updatedAt
+                    @@unique([userId, variantId])
+}
+
+model Order {
+    id            String      @id @default(uuid())
+      invoiceNumber String      @unique
+        totalAmount   Int
+          status        OrderStatus @default(PENDING)
+            trackingResi  String?
+              notes         String?     @db.Text
+
+                userId        String
+                  user          User        @relation(fields: [userId], references: [id])
+
+                    orderItems    OrderItem[]
+                      createdAt     DateTime    @default(now())
+                        updatedAt     DateTime    @updatedAt
+}
+
+model OrderItem {
+    id              String         @id @default(uuid())
+      quantity        Int
+        priceAtPurchase Int
+
+          orderId         String
+            order           Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+              variantId       String
+                variant         ProductVariant @relation(fields: [variantId], references: [id])
+}
