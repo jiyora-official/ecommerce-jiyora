@@ -1,0 +1,140 @@
+import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
+import 'dotenv/config'
+
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+})
+const prisma = new PrismaClient({ adapter })
+
+async function upsertCategory(name: string, slug: string) {
+  return prisma.category.upsert({
+    where: { slug },
+    update: {},
+    create: { name, slug },
+  })
+}
+
+async function upsertProduct(params: {
+  name: string
+  slug: string
+  description: string
+  basePrice: number
+  categoryId: string
+  imageUrl: string
+  variants: { sku: string; color: string; size: string; stock: number }[]
+}) {
+  const existing = await prisma.product.findUnique({ where: { slug: params.slug } })
+  if (existing) {
+    console.log(`Produk "${params.name}" sudah ada, dilewati.`)
+    return existing
+  }
+  return prisma.product.create({
+    data: {
+      name: params.name,
+      slug: params.slug,
+      description: params.description,
+      basePrice: params.basePrice,
+      categoryId: params.categoryId,
+      images: { create: [{ url: params.imageUrl, isPrimary: true }] },
+      variants: { create: params.variants },
+    },
+  })
+}
+
+async function main() {
+  // Kategori lama tetap dipertahankan (dipakai produk pertama)
+  const pakaianPria = await upsertCategory('Pakaian Pria', 'pakaian-pria')
+
+  await upsertProduct({
+    name: 'Kaos Polos Premium',
+    slug: 'kaos-polos-premium',
+    description: 'Kaos polos bahan katun combed 30s, nyaman dipakai sehari-hari.',
+    basePrice: 85000,
+    categoryId: pakaianPria.id,
+    imageUrl: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600',
+    variants: [
+      { sku: 'KPP-BLK-M', color: 'Hitam', size: 'M', stock: 20 },
+      { sku: 'KPP-BLK-L', color: 'Hitam', size: 'L', stock: 15 },
+      { sku: 'KPP-WHT-M', color: 'Putih', size: 'M', stock: 10 },
+    ],
+  })
+
+  // Kategori baru untuk 5 produk tambahan
+  const pakaianWanita = await upsertCategory('Pakaian Wanita', 'pakaian-wanita')
+
+  await upsertProduct({
+    name: 'Blouse Wanita Katun',
+    slug: 'blouse-wanita-katun',
+    description: 'Blouse bahan katun ringan dengan potongan longgar, nyaman untuk sehari-hari.',
+    basePrice: 95000,
+    categoryId: pakaianWanita.id,
+    imageUrl: 'https://picsum.photos/seed/blouse-wanita-katun/600/600',
+    variants: [
+      { sku: 'BWK-WHT-S', color: 'Putih', size: 'S', stock: 15 },
+      { sku: 'BWK-WHT-M', color: 'Putih', size: 'M', stock: 18 },
+      { sku: 'BWK-PNK-M', color: 'Pink', size: 'M', stock: 12 },
+    ],
+  })
+
+  await upsertProduct({
+    name: 'Dress Casual Midi',
+    slug: 'dress-casual-midi',
+    description: 'Dress midi motif polos, cocok dipakai untuk acara santai maupun kerja.',
+    basePrice: 165000,
+    categoryId: pakaianWanita.id,
+    imageUrl: 'https://picsum.photos/seed/dress-casual-midi/600/600',
+    variants: [
+      { sku: 'DCM-BLK-S', color: 'Hitam', size: 'S', stock: 10 },
+      { sku: 'DCM-BLK-M', color: 'Hitam', size: 'M', stock: 14 },
+      { sku: 'DCM-NVY-M', color: 'Navy', size: 'M', stock: 9 },
+    ],
+  })
+
+  await upsertProduct({
+    name: 'Rok Plisket Midi',
+    slug: 'rok-plisket-midi',
+    description: 'Rok plisket bahan jatuh, cocok dipadukan dengan atasan apapun.',
+    basePrice: 120000,
+    categoryId: pakaianWanita.id,
+    imageUrl: 'https://picsum.photos/seed/rok-plisket-midi/600/600',
+    variants: [
+      { sku: 'RPM-BLK-M', color: 'Hitam', size: 'M', stock: 11 },
+      { sku: 'RPM-BEI-M', color: 'Beige', size: 'M', stock: 13 },
+    ],
+  })
+
+  await upsertProduct({
+    name: 'Cardigan Rajut',
+    slug: 'cardigan-rajut',
+    description: 'Cardigan rajut lembut, cocok dipakai di cuaca dingin atau ber-AC.',
+    basePrice: 135000,
+    categoryId: pakaianWanita.id,
+    imageUrl: 'https://picsum.photos/seed/cardigan-rajut/600/600',
+    variants: [
+      { sku: 'CR-CRM-S', color: 'Cream', size: 'S', stock: 10 },
+      { sku: 'CR-CRM-M', color: 'Cream', size: 'M', stock: 12 },
+      { sku: 'CR-GRY-M', color: 'Abu-abu', size: 'M', stock: 8 },
+    ],
+  })
+
+  await upsertProduct({
+    name: 'Celana Kulot Wanita',
+    slug: 'celana-kulot-wanita',
+    description: 'Celana kulot bahan katun stretch, potongan lebar dan nyaman dipakai.',
+    basePrice: 110000,
+    categoryId: pakaianWanita.id,
+    imageUrl: 'https://picsum.photos/seed/celana-kulot-wanita/600/600',
+    variants: [
+      { sku: 'CKW-BLK-M', color: 'Hitam', size: 'M', stock: 14 },
+      { sku: 'CKW-BLK-L', color: 'Hitam', size: 'L', stock: 10 },
+    ],
+  })
+
+  console.log('Seed data berhasil ditambahkan/diperbarui!')
+}
+
+main()
+  .catch((e) => { console.error(e); process.exit(1) })
+  .finally(async () => { await prisma.$disconnect() })
